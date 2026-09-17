@@ -1,0 +1,71 @@
+{
+  "name": "catpaw-chat-sidebar",
+  "displayName": "Workspace",
+  "description": "A private Workspace for VS Code-compatible IDEs.",
+  "version": "0.0.18",
+  "publisher": "catpaw",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onView:catpawWorkspace.sidebar",
+    "onCommand:workspace.quickHide"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "catpawWorkspace",
+          "title": "Workspace",
+          "icon": "media/workspace.svg"
+        }
+      ]
+    },
+    "views": {
+      "catpawWorkspace": [
+        {
+          "type": "webview",
+          "id": "catpawWorkspace.sidebar",
+          "name": "Workspace"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "workspace.quickHide",
+        "title": "Workspace: Quick Hide"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "workspace.quickHide",
+        "key": "ctrl+alt+h"
+      }
+    ]
+  },
+  "overrides": {
+    "cheerio": "1.0.0-rc.12"
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node --test out/test/*.test.js",
+    "package": "npm run compile && vsce package --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7",
+    "@types/node": "^20.14.15",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "2.26.1",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.5.0",
+    "jsdom": "^24.1.3"
+  }
+}
