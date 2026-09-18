@@ -7,7 +7,7 @@ Workspace 是一个可安装到 CatPaw 或 VS Code 的本地工作区扩展。�
 - **Dashboard**：Inbox 未读、阅读进度、Mock AI、最近游戏、Quick Break 与 Privacy Mode。
 - **Inbox**：四个 Mock 会话、搜索、未读、发送、Enter 发送与 Shift+Enter 换行。
 - **AI**：本地 Mock AI，可创建、重命名、删除会话并保存状态。
-- **Reader**：由 Extension Host 打开本地 TXT，支持 UTF-8、UTF-16、GB18030/GBK 解码、自动分章、本地书目、章节搜索、书签、进度和阅读样式。
+- **Reader**：由 Extension Host 打开本地 TXT，支持 UTF-8、UTF-16、GB18030/GBK 解码、自动分章、可命名本地书架、章节搜索、书签、最近章节、阅读统计与阅读样式。
 - **Text Web**：提供安全的 **Reader / Document / Source Text** 三种文本视图。网页会在 Extension Host 中规范化后再显示，Reader 视图会移除导航、Cookie、登录提示、页脚与推荐等噪音。需要脚本、登录、验证码或二维码时，可明确打开 IDE 内的 **Interactive Browser**（Simple Browser）；**Open External** 仅在用户主动点击时打开系统浏览器。
 - **Break**：Snake、Flappy、2048、Breakout、Tetris、Mines、Sudoku、Bubble 八个纯原生小游戏。
 - **Privacy Mode**：Inbox 与 Dashboard 内的联系人和预览匿名/模糊；重新进入时显示 Dashboard。
@@ -35,7 +35,7 @@ Reader 只读取用户主动选择的本地 TXT；文件由 Extension Host 读�
 
 - **编码与目录**：自动尝试 UTF-8、UTF-16、GB18030、GBK，并识别“第…章/节/回/篇/话”、序章、楔子和尾声等章节标题；没有标题时按文本块分章。
 - **阅读控制**：只要当前显示 Reader，`Ctrl+;` 即可上一页，`Ctrl+'` 即可下一页，无需先点击正文；章节仅通过目录与上一章/下一章按钮选择。
-- **样式**：Reader 工具栏内可直接调整 0–100% 透明度，工具栏会同步淡化；`Ctrl+↑ / Ctrl+↓` 可每次调节 5%。同一处的 **Size** 滑块可实时调整正文显示框高度。勾选 **Hide controls** 后会隐藏标题与左侧导航，仅保留正文和右下角固定的 **Controls** 恢复入口（也可按 `Ctrl+Alt+R`）。目录保持高对比、不透明，便于阅读。Settings 中可调字号、行距、宽度、高度和 System/Paper/Dim 主题。
+- **书架与样式**：导入 TXT 时可自定义书名；书架支持打开、重命名和移除记录（绝不删除原 TXT），并保存每本书的进度、书签、最近章节和阅读时长。`显示` 面板可快速调整系统/纸张/暗色/夜读主题、字号、行距、宽度、高度和透明度；`Ctrl+↑ / Ctrl+↓` 每次调整 5% 透明度。勾选隐藏控件后会隐藏标题与左侧导航，仅保留正文和右下角固定的恢复入口（也可按 `Ctrl+Alt+R`）。`屏幕遮罩` 会以中性页面覆盖正文；`离开模糊` 可在鼠标离开正文时轻度模糊文本。
 - **Quick Hide**：默认仍为 `Ctrl+Alt+H`，只在 Dashboard 和之前模块间切换。Settings 的 **Configure Quick Hide Shortcut** 会打开 IDE 标准快捷键设置，便于自行修改。
 
 ## 游戏控制
@@ -61,7 +61,7 @@ npm test
 npm run package
 ```
 
-`npm run package` 会在项目根目录生成 `catpaw-chat-sidebar-0.0.24.vsix`。
+`npm run package` 会在项目根目录生成 `catpaw-chat-sidebar-0.0.25.vsix`。
 
 ## 安装到 CatPaw / VS Code
 
