@@ -160,6 +160,8 @@ test('Reader is local-only and turns pages from global Ctrl shortcuts', () => {
   assert.equal(dom.window.document.querySelector('.online-library'), null);
   assert.equal(pageMovement, -240);
   assert.notEqual(sent.at(-1)?.type, 'readerOpenChapter');
+  const display = Array.from(dom.window.document.querySelectorAll('button')).find((item) => item.textContent === '显示');
+  display?.click();
   assert.match(dom.window.document.querySelector('.reader-opacity-control')?.textContent ?? '', /Opacity/);
   const size = dom.window.document.querySelector<HTMLInputElement>('.reader-size-control input');
   assert.equal(size?.value, '480');
@@ -198,6 +200,23 @@ test('Reader batches frequent scroll progress saves', async () => {
   dom.window.close();
 });
 
+test('Reader shows Chinese bookshelf and display entries with hover hints', () => {
+  const dom = new JSDOM('<!doctype html><div id="app"></div>', { runScripts: 'outside-only', url: 'https://workspace.test/' });
+  const source = readFileSync(resolve(__dirname, '../../media/workspace.js'), 'utf8');
+  dom.window.eval(`var __workspaceSent = []; var acquireVsCodeApi = () => ({ postMessage: message => __workspaceSent.push(message) });\n${source}`);
+  dom.window.dispatchEvent(new dom.window.MessageEvent('message', {
+    data: { type: 'bootstrap', module: 'reader', app: { settings: {}, reader: { uri: 'file:///book.txt', title: '自定义书名', chapterIndex: 0, chapterPosition: 0, bookmarks: [], library: [{ uri: 'file:///book.txt', title: '自定义书名', lastOpened: 1, progress: 22, chapterIndex: 0, chapterPosition: 0, bookmarks: [], recentChapters: [], totalReadingSeconds: 0 }] }, web: {} }, readerDocument: { title: 'book.txt', chapters: [{ index: 0, title: '第一章', start: 0, end: 2 }] }, readerChapter: { chapter: { index: 0, title: '第一章', start: 0, end: 2 }, text: '正文' } }
+  }));
+
+  const libraryButton = Array.from(dom.window.document.querySelectorAll('button')).find((item) => item.textContent === '书架');
+  const displayButton = Array.from(dom.window.document.querySelectorAll('button')).find((item) => item.textContent === '显示');
+  assert.equal(libraryButton?.getAttribute('title'), 'Open library');
+  assert.equal(displayButton?.getAttribute('title'), 'Display options');
+  libraryButton?.click();
+  assert.match(dom.window.document.body.textContent ?? '', /自定义书名/);
+  dom.window.close();
+});
+
 test('Hidden Reader controls keep a fixed restore control and support opacity shortcuts', () => {
   const dom = new JSDOM('<!doctype html><div id="app"></div>', { runScripts: 'outside-only', url: 'https://workspace.test/' });
   const source = readFileSync(resolve(__dirname, '../../media/workspace.js'), 'utf8');
@@ -207,7 +226,7 @@ test('Hidden Reader controls keep a fixed restore control and support opacity sh
   }));
   assert.equal(dom.window.document.querySelector('.reader-page')?.classList.contains('reader-controls-hidden'), true);
   assert.equal(dom.window.document.querySelector('.shell')?.classList.contains('reader-focus-shell'), true);
-  assert.equal(dom.window.document.querySelector('.reader-focus-restore')?.textContent, 'Controls');
+  assert.equal(dom.window.document.querySelector('.reader-focus-restore')?.textContent, '恢复');
   dom.window.document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowUp', ctrlKey: true, bubbles: true }));
   const sent = dom.window.__workspaceSent as Array<Record<string, unknown>>;
   assert.equal((sent.at(-1)?.data as { readerOpacity?: number }).readerOpacity, 45);
