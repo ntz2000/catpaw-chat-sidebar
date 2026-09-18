@@ -138,7 +138,7 @@ test('switches from safe text to an in-Workspace full-page frame when a site per
   dom.window.close();
 });
 
-test('Reader is local-only and sends chapter navigation from its focused reading surface', () => {
+test('Reader is local-only and turns pages from global Ctrl shortcuts', () => {
   const dom = new JSDOM('<!doctype html><div id="app"></div>', { runScripts: 'outside-only', url: 'https://workspace.test/' });
   const source = readFileSync(resolve(__dirname, '../../media/workspace.js'), 'utf8');
   dom.window.eval(`var __workspaceSent = []; var acquireVsCodeApi = () => ({ postMessage: message => __workspaceSent.push(message) });\n${source}`);
@@ -152,23 +152,46 @@ test('Reader is local-only and sends chapter navigation from its focused reading
   }));
 
   const surface = dom.window.document.querySelector<HTMLElement>('.reader-surface');
-  surface?.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+  let pageMovement = 0;
+  Object.defineProperty(surface, 'clientHeight', { value: 240 });
+  if (surface) surface.scrollBy = ((...args: unknown[]) => { pageMovement += Number(args[1] ?? 0); }) as typeof surface.scrollBy;
+  dom.window.document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: ';', ctrlKey: true, bubbles: true }));
   const sent = dom.window.__workspaceSent as Array<Record<string, unknown>>;
   assert.equal(dom.window.document.querySelector('.online-library'), null);
-  assert.equal(sent.at(-1)?.type, 'readerOpenChapter');
-  assert.equal(sent.at(-1)?.chapterIndex, 1);
+  assert.equal(pageMovement, -240);
+  assert.notEqual(sent.at(-1)?.type, 'readerOpenChapter');
+  assert.match(dom.window.document.querySelector('.reader-opacity-control')?.textContent ?? '', /Opacity/);
   const readerPage = dom.window.document.querySelector<HTMLElement>('.reader-page');
   assert.equal(readerPage?.style.getPropertyValue('--reader-opacity'), '0.42');
   assert.equal(readerPage?.style.getPropertyValue('--reader-height'), '480px');
   dom.window.close();
 });
 
-test('Settings exposes Reader opacity, text height, and Quick Hide shortcut configuration', () => {
+test('Reader batches frequent scroll progress saves', async () => {
+  const dom = new JSDOM('<!doctype html><div id="app"></div>', { runScripts: 'outside-only', url: 'https://workspace.test/' });
+  const source = readFileSync(resolve(__dirname, '../../media/workspace.js'), 'utf8');
+  dom.window.eval(`var __workspaceSent = []; var acquireVsCodeApi = () => ({ postMessage: message => __workspaceSent.push(message) });\n${source}`);
+  dom.window.dispatchEvent(new dom.window.MessageEvent('message', {
+    data: { type: 'bootstrap', module: 'reader', app: { settings: {}, reader: { chapterIndex: 0, bookmarks: [], library: [] }, web: {} }, readerDocument: { title: 'Local', chapters: [{ index: 0, title: '第一章', start: 0, end: 10 }] }, readerChapter: { chapter: { index: 0, title: '第一章', start: 0, end: 10 }, text: '正文' } }
+  }));
+  const surface = dom.window.document.querySelector<HTMLElement>('.reader-surface');
+  Object.defineProperty(surface, 'scrollHeight', { value: 1000 });
+  Object.defineProperty(surface, 'clientHeight', { value: 200 });
+  if (surface) surface.scrollTop = 100;
+  surface?.dispatchEvent(new dom.window.Event('scroll'));
+  surface?.dispatchEvent(new dom.window.Event('scroll'));
+  const sent = dom.window.__workspaceSent as Array<Record<string, unknown>>;
+  assert.equal(sent.filter((item) => item.type === 'saveReader').length, 0);
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.equal(sent.filter((item) => item.type === 'saveReader').length, 1);
+  dom.window.close();
+});
+
+test('Settings exposes Reader height and Quick Hide shortcut configuration', () => {
   const dom = new JSDOM('<!doctype html><div id="app"></div>', { runScripts: 'outside-only', url: 'https://workspace.test/' });
   const source = readFileSync(resolve(__dirname, '../../media/workspace.js'), 'utf8');
   dom.window.eval(`var __workspaceSent = []; var acquireVsCodeApi = () => ({ postMessage: message => __workspaceSent.push(message) });\n${source}`);
   dom.window.dispatchEvent(new dom.window.MessageEvent('message', { data: { type: 'bootstrap', module: 'settings', app: { settings: {}, reader: {}, web: {} } } }));
-  assert.match(dom.window.document.body.textContent ?? '', /Reader Opacity/);
   assert.match(dom.window.document.body.textContent ?? '', /Reader Height/);
   const configure = Array.from(dom.window.document.querySelectorAll('button')).find((item) => item.textContent === 'Configure Quick Hide Shortcut');
   configure?.click();

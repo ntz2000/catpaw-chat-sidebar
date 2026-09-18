@@ -34,8 +34,8 @@ Text Web 的文本模式不是完整浏览器：它不加载远程 JavaScript/CS
 Reader 只读取用户主动选择的本地 TXT；文件由 Extension Host 读取，Webview 不接触文件系统。打开后会记录到本地书目，并只渲染当前章节，适合较大的 TXT。
 
 - **编码与目录**：自动尝试 UTF-8、UTF-16、GB18030、GBK，并识别“第…章/节/回/篇/话”、序章、楔子和尾声等章节标题；没有标题时按文本块分章。
-- **阅读控制**：正文聚焦后，`W/S` 翻上一页/下一页，`A/D` 切换章节，`Space`/`Shift+Space` 翻页，`B` 添加书签，`T` 开关目录，`/` 聚焦搜索，`Esc` 返回正文。
-- **样式**：Settings 中可调字号、行距、宽度、高度、System/Paper/Dim 主题以及正文表层 0–100% 透明度。透明度不会改变 IDE 窗口或其他区域。
+- **阅读控制**：只要当前显示 Reader，`Ctrl+;` 即可上一页，`Ctrl+'` 即可下一页，无需先点击正文；章节仅通过目录与上一章/下一章按钮选择。
+- **样式**：Reader 工具栏内可直接调整正文 0–100% 透明度；Settings 中可调字号、行距、宽度、高度和 System/Paper/Dim 主题。透明度不会改变 IDE 窗口或其他区域。
 - **Quick Hide**：默认仍为 `Ctrl+Alt+H`，只在 Dashboard 和之前模块间切换。Settings 的 **Configure Quick Hide Shortcut** 会打开 IDE 标准快捷键设置，便于自行修改。
 
 ## 游戏控制
@@ -61,7 +61,7 @@ npm test
 npm run package
 ```
 
-`npm run package` 会在项目根目录生成 `catpaw-chat-sidebar-0.0.19.vsix`。
+`npm run package` 会在项目根目录生成 `catpaw-chat-sidebar-0.0.20.vsix`。
 
 ## 安装到 CatPaw / VS Code
 

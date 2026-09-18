@@ -92,9 +92,12 @@ export class WorkspaceViewProvider implements vscode.WebviewViewProvider {
   private async openReaderChapter(webview: vscode.Webview, requestedIndex: number): Promise<void> {
     const reader = this.state.snapshot().reader;
     if (!reader.uri) return;
-    const content = await this.reader.getChapter(reader.uri, requestedIndex);
-    await this.state.updateReader({ chapterIndex: content.chapter.index, chapterPosition: 0, position: 0, progress: Math.round(((content.chapter.index + 1) / Math.max(1, (await this.reader.readUri(reader.uri)).chapters.length)) * 100) });
+    const document = await this.reader.readUri(reader.uri);
+    const chapter = document.chapters[Math.max(0, Math.min(requestedIndex, document.chapters.length - 1))];
+    const content = { chapter, text: document.text.slice(chapter.start, chapter.end) };
+    const persist = this.state.updateReader({ chapterIndex: chapter.index, chapterPosition: 0, position: 0, progress: Math.round(((chapter.index + 1) / Math.max(1, document.chapters.length)) * 100) });
     await this.post(webview, { type: 'readerChapter', data: content, reader: this.state.snapshot().reader });
+    await persist;
   }
   private async openRecentReader(webview: vscode.Webview, uri: string): Promise<void> {
     const document = await this.reader.readUri(uri);
