@@ -191,17 +191,20 @@ test('Reader batches frequent scroll progress saves', async () => {
   dom.window.close();
 });
 
-test('Hidden Reader controls leave a text-only surface and restore from the keyboard', () => {
+test('Hidden Reader controls keep a fixed restore control and support opacity shortcuts', () => {
   const dom = new JSDOM('<!doctype html><div id="app"></div>', { runScripts: 'outside-only', url: 'https://workspace.test/' });
   const source = readFileSync(resolve(__dirname, '../../media/workspace.js'), 'utf8');
   dom.window.eval(`var __workspaceSent = []; var acquireVsCodeApi = () => ({ postMessage: message => __workspaceSent.push(message) });\n${source}`);
   dom.window.dispatchEvent(new dom.window.MessageEvent('message', {
-    data: { type: 'bootstrap', module: 'reader', app: { settings: { readerControlsHidden: true }, reader: { chapterIndex: 0, bookmarks: [], library: [] }, web: {} }, readerDocument: { title: 'Local', chapters: [{ index: 0, title: '第一章', start: 0, end: 2 }] }, readerChapter: { chapter: { index: 0, title: '第一章', start: 0, end: 2 }, text: '正文' } }
+    data: { type: 'bootstrap', module: 'reader', app: { settings: { readerControlsHidden: true, readerOpacity: 40 }, reader: { chapterIndex: 0, bookmarks: [], library: [] }, web: {} }, readerDocument: { title: 'Local', chapters: [{ index: 0, title: '第一章', start: 0, end: 2 }] }, readerChapter: { chapter: { index: 0, title: '第一章', start: 0, end: 2 }, text: '正文' } }
   }));
   assert.equal(dom.window.document.querySelector('.reader-page')?.classList.contains('reader-controls-hidden'), true);
-  assert.equal(dom.window.document.querySelector('.reader-controls-toggle'), null);
-  dom.window.document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'r', ctrlKey: true, altKey: true, bubbles: true }));
+  assert.equal(dom.window.document.querySelector('.shell')?.classList.contains('reader-focus-shell'), true);
+  assert.equal(dom.window.document.querySelector('.reader-focus-restore')?.textContent, 'Controls');
+  dom.window.document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowUp', ctrlKey: true, bubbles: true }));
   const sent = dom.window.__workspaceSent as Array<Record<string, unknown>>;
+  assert.equal((sent.at(-1)?.data as { readerOpacity?: number }).readerOpacity, 45);
+  dom.window.document.querySelector<HTMLButtonElement>('.reader-focus-restore')?.click();
   assert.equal((sent.at(-1)?.data as { readerControlsHidden?: boolean }).readerControlsHidden, false);
   dom.window.close();
 });
