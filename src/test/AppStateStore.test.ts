@@ -44,7 +44,7 @@ test('keeps Text Web navigation history, forward state, and bookmarks', async ()
 test('keeps reader display preferences and chapter-aware bookmarks', async () => {
   const store = new AppStateStore(new MemoryStore());
 
-  await store.updateSettings({ readerOpacity: 42, readerHeight: 480, readerMode: 'page', readerControlsHidden: true });
+  await store.updateSettings({ readerOpacity: 42, readerHeight: 480, readerMode: 'page', readerControlsHidden: true, readerShield: true, readerHoverBlur: true });
   await store.updateReader({
     chapterIndex: 2,
     chapterPosition: 34,
@@ -55,6 +55,8 @@ test('keeps reader display preferences and chapter-aware bookmarks', async () =>
   assert.equal(store.snapshot().settings.readerHeight, 480);
   assert.equal(store.snapshot().settings.readerMode, 'page');
   assert.equal(store.snapshot().settings.readerControlsHidden, true);
+  assert.equal(store.snapshot().settings.readerShield, true);
+  assert.equal(store.snapshot().settings.readerHoverBlur, true);
   assert.deepEqual(store.snapshot().reader.bookmarks, [{ chapterIndex: 2, position: 34, label: '关键段落' }]);
 });
 
@@ -98,4 +100,14 @@ test('records recent chapters for the active bookshelf entry in newest-first ord
   await store.recordReaderRecentChapter('file:///book.txt', { chapterIndex: 2, chapterPosition: 30, title: '第三章' });
 
   assert.deepEqual(store.snapshot().reader.library[0].recentChapters.map((item) => item.title), ['第三章', '第二章']);
+});
+
+test('adds local reading time to the matching bookshelf entry', async () => {
+  const store = new AppStateStore(new MemoryStore());
+  await store.upsertReaderLibraryEntry({ uri: 'file:///book.txt', title: '阅读统计' });
+
+  await store.addReaderReadingSeconds('file:///book.txt', 95);
+
+  assert.equal(store.snapshot().reader.library[0].totalReadingSeconds, 95);
+  assert.equal(typeof store.snapshot().reader.library[0].lastReadAt, 'number');
 });

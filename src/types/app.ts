@@ -11,6 +11,8 @@ export interface WorkspaceSettings {
   readerHeight: number;
   readerOpacity: number;
   readerControlsHidden: boolean;
+  readerShield: boolean;
+  readerHoverBlur: boolean;
   readerTheme: ReaderTheme;
   readerMode: ReaderMode;
   readerFontFamily: string;

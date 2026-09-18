@@ -1,5 +1,5 @@
 export type ReaderMode = 'scroll' | 'page';
-export type ReaderTheme = 'system' | 'paper' | 'dim';
+export type ReaderTheme = 'system' | 'paper' | 'dim' | 'night';
 
 export interface ReaderChapter {
   index: number;

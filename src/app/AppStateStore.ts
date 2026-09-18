@@ -23,6 +23,8 @@ function initialState(): WorkspaceSnapshot {
       readerHeight: 560,
       readerOpacity: 100,
       readerControlsHidden: false,
+      readerShield: false,
+      readerHoverBlur: false,
       readerTheme: 'system',
       readerMode: 'scroll',
       readerFontFamily: 'var(--vscode-editor-font-family)',
@@ -139,6 +141,12 @@ export class AppStateStore {
     const recent = { ...chapter, openedAt: Date.now() };
     const entry = { ...existing, lastOpened: recent.openedAt, recentChapters: [recent, ...existing.recentChapters.filter((item) => item.chapterIndex !== recent.chapterIndex || item.chapterPosition !== recent.chapterPosition)].slice(0, 10) };
     this.state.reader.library = [entry, ...this.state.reader.library.filter((item) => item.uri !== uri)];
+    await this.persist();
+  }
+
+  public async addReaderReadingSeconds(uri: string, seconds: number): Promise<void> {
+    if (!Number.isFinite(seconds) || seconds <= 0) return;
+    this.state.reader.library = this.state.reader.library.map((item) => item.uri === uri ? { ...item, totalReadingSeconds: item.totalReadingSeconds + Math.min(3600, Math.floor(seconds)), lastReadAt: Date.now() } : item);
     await this.persist();
   }
 

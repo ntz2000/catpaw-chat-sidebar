@@ -210,8 +210,8 @@ test('Reader shows Chinese bookshelf and display entries with hover hints', () =
 
   const libraryButton = Array.from(dom.window.document.querySelectorAll('button')).find((item) => item.textContent === '书架');
   const displayButton = Array.from(dom.window.document.querySelectorAll('button')).find((item) => item.textContent === '显示');
-  assert.equal(libraryButton?.getAttribute('title'), 'Open library');
-  assert.equal(displayButton?.getAttribute('title'), 'Display options');
+  assert.equal(libraryButton?.getAttribute('title'), '打开书架');
+  assert.equal(displayButton?.getAttribute('title'), '显示选项');
   libraryButton?.click();
   assert.match(dom.window.document.body.textContent ?? '', /自定义书名/);
   dom.window.close();
@@ -232,6 +232,20 @@ test('Hidden Reader controls keep a fixed restore control and support opacity sh
   assert.equal((sent.at(-1)?.data as { readerOpacity?: number }).readerOpacity, 45);
   dom.window.document.querySelector<HTMLButtonElement>('.reader-focus-restore')?.click();
   assert.equal((sent.at(-1)?.data as { readerControlsHidden?: boolean }).readerControlsHidden, false);
+  dom.window.close();
+});
+
+test('Reader screen shield covers text and can be dismissed locally', () => {
+  const dom = new JSDOM('<!doctype html><div id="app"></div>', { runScripts: 'outside-only', url: 'https://workspace.test/' });
+  const source = readFileSync(resolve(__dirname, '../../media/workspace.js'), 'utf8');
+  dom.window.eval(`var __workspaceSent = []; var acquireVsCodeApi = () => ({ postMessage: message => __workspaceSent.push(message) });\n${source}`);
+  dom.window.dispatchEvent(new dom.window.MessageEvent('message', {
+    data: { type: 'bootstrap', module: 'reader', app: { settings: { readerShield: true, readerHoverBlur: true }, reader: { chapterIndex: 0, bookmarks: [], library: [] }, web: {} }, readerDocument: { title: 'Local', chapters: [{ index: 0, title: '第一章', start: 0, end: 2 }] }, readerChapter: { chapter: { index: 0, title: '第一章', start: 0, end: 2 }, text: '正文' } }
+  }));
+  assert.equal(dom.window.document.querySelector('.reader-screen-shield')?.textContent, '显示文本');
+  assert.equal(dom.window.document.querySelector('.reader-page')?.classList.contains('reader-hover-blur'), true);
+  dom.window.document.querySelector<HTMLButtonElement>('.reader-screen-shield button')?.click();
+  assert.equal(((dom.window.__workspaceSent as Array<Record<string, unknown>>).at(-1)?.data as { readerShield?: boolean }).readerShield, false);
   dom.window.close();
 });
 
