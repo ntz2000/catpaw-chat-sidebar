@@ -14,6 +14,8 @@ Workspace 是一个可安装到 CatPaw 或 VS Code 的本地工作区扩展。�
 - **Quick Hide**：`Workspace: Quick Hide`，默认 `Ctrl+Alt+H`，在 Dashboard 与之前模块间切换。
 - **Settings**：Privacy Mode、动画、游戏声音、Reader/Text Web 字号、行距、宽度及默认页，均保存到 `globalState`。
 
+Reader 的当前边界、后续本地 TXT 升级方案、透明度与键盘控制说明见 [docs/reader-guide.md](docs/reader-guide.md)。文档会明确区分已实现与规划中的功能。
+
 ## Text Web
 
 Text Web 的文本模式不是完整浏览器：它不加载远程 JavaScript/CSS，也不会把下载到的 HTML 原样插入 Webview。网页会在扩展主机中经过 `jsdom` 和 `@mozilla/readability` 解析，再转换为安全的标题、段落、列表、引用、代码、表格和链接数据。
