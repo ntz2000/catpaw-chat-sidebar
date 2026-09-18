@@ -88,3 +88,14 @@ test('removing a bookshelf entry clears only its local record', async () => {
   assert.equal(store.snapshot().reader.library.length, 0);
   assert.equal(store.snapshot().reader.uri, undefined);
 });
+
+test('records recent chapters for the active bookshelf entry in newest-first order', async () => {
+  const store = new AppStateStore(new MemoryStore());
+  await store.upsertReaderLibraryEntry({ uri: 'file:///book.txt', title: '章节记录' });
+  await store.updateReader({ uri: 'file:///book.txt', title: '章节记录' });
+
+  await store.recordReaderRecentChapter('file:///book.txt', { chapterIndex: 1, chapterPosition: 20, title: '第二章' });
+  await store.recordReaderRecentChapter('file:///book.txt', { chapterIndex: 2, chapterPosition: 30, title: '第三章' });
+
+  assert.deepEqual(store.snapshot().reader.library[0].recentChapters.map((item) => item.title), ['第三章', '第二章']);
+});

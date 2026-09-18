@@ -4,7 +4,7 @@ import { AppStateStore } from './AppStateStore';
 import { selectBrowserOpenCommand } from './browserCommand';
 import { AIService } from '../services/AIService';
 import { ChatService } from '../services/ChatService';
-import { ReaderDocument, ReaderLibraryEntry } from '../types/reader';
+import { ReaderDocument } from '../types/reader';
 import { ReaderService } from '../services/ReaderService';
 import { WebService, WebServiceError, normalizeWebUrl } from '../services/WebService';
 import { WorkspaceModule, WorkspaceSettings, WorkspaceSnapshot } from '../types/app';
@@ -42,14 +42,18 @@ export class WorkspaceViewProvider implements vscode.WebviewViewProvider {
         case 'openReaderFile': {
           const document = await this.reader.openFile();
           if (document) {
-            const library = updateReaderLibrary(this.state.snapshot().reader.library, document);
-            await this.state.updateReader({ title: document.title, uri: document.uri, progress: 0, position: 0, chapterIndex: 0, chapterPosition: 0, bookmarks: [], library });
+            const title = await this.requestReaderTitle(document.title);
+            const entry = await this.state.upsertReaderLibraryEntry({ uri: document.uri, title });
+            await this.state.updateReader({ title: entry.title, uri: document.uri, progress: entry.progress, position: entry.chapterPosition, chapterIndex: entry.chapterIndex, chapterPosition: entry.chapterPosition, bookmarks: entry.bookmarks });
             await this.postReaderDocument(webview, document, 0);
           }
           break;
         }
         case 'readerOpenChapter': if (isNonNegativeInteger(request.chapterIndex)) await this.openReaderChapter(webview, request.chapterIndex); break;
         case 'readerOpenRecent': if (isString(request.uri)) await this.openRecentReader(webview, request.uri); break;
+        case 'readerOpenRecentChapter': if (isString(request.uri) && isNonNegativeInteger(request.chapterIndex) && typeof request.chapterPosition === 'number') { await this.openRecentReader(webview, request.uri, request.chapterIndex, request.chapterPosition); } break;
+        case 'readerRenameLibrary': if (isString(request.uri)) await this.renameReaderLibrary(webview, request.uri); break;
+        case 'readerRemoveLibrary': if (isString(request.uri)) await this.removeReaderLibrary(webview, request.uri); break;
         case 'readerSearch': if (isString(request.query)) await this.searchReader(webview, request.query); break;
         case 'readerAddBookmark': await this.addReaderBookmark(webview, isString(request.label) ? request.label : undefined); break;
         case 'readerRemoveBookmark': if (isNonNegativeInteger(request.index)) { const bookmarks = this.state.snapshot().reader.bookmarks.filter((_, index) => index !== request.index); await this.state.updateReader({ bookmarks }); await this.post(webview, { type: 'app', data: this.state.snapshot() }); } break;
@@ -96,14 +100,44 @@ export class WorkspaceViewProvider implements vscode.WebviewViewProvider {
     const chapter = document.chapters[Math.max(0, Math.min(requestedIndex, document.chapters.length - 1))];
     const content = { chapter, text: document.text.slice(chapter.start, chapter.end) };
     const persist = this.state.updateReader({ chapterIndex: chapter.index, chapterPosition: 0, position: 0, progress: Math.round(((chapter.index + 1) / Math.max(1, document.chapters.length)) * 100) });
+    await this.state.recordReaderRecentChapter(document.uri, { chapterIndex: chapter.index, chapterPosition: 0, title: chapter.title });
     await this.post(webview, { type: 'readerChapter', data: content, reader: this.state.snapshot().reader });
     await persist;
   }
-  private async openRecentReader(webview: vscode.Webview, uri: string): Promise<void> {
+  private async openRecentReader(webview: vscode.Webview, uri: string, requestedChapterIndex?: number, requestedChapterPosition?: number): Promise<void> {
     const document = await this.reader.readUri(uri);
-    const library = updateReaderLibrary(this.state.snapshot().reader.library, document);
-    await this.state.updateReader({ title: document.title, uri: document.uri, progress: 0, position: 0, chapterIndex: 0, chapterPosition: 0, bookmarks: [], library });
-    await this.postReaderDocument(webview, document, 0);
+    const previous = this.state.snapshot().reader.library.find((item) => item.uri === uri);
+    const entry = await this.state.upsertReaderLibraryEntry({ uri: document.uri, title: previous?.title ?? defaultReaderTitle(document.title) });
+    const chapterIndex = requestedChapterIndex ?? entry.chapterIndex;
+    const chapterPosition = requestedChapterPosition ?? entry.chapterPosition;
+    await this.state.updateReader({ title: entry.title, uri: document.uri, progress: entry.progress, position: chapterPosition, chapterIndex, chapterPosition, bookmarks: entry.bookmarks });
+    await this.state.recordReaderRecentChapter(document.uri, { chapterIndex, chapterPosition, title: document.chapters[chapterIndex]?.title ?? `Chapter ${chapterIndex + 1}` });
+    await this.postReaderDocument(webview, document, chapterIndex);
+  }
+
+  private async requestReaderTitle(fileName: string): Promise<string> {
+    const suggested = defaultReaderTitle(fileName);
+    const title = await vscode.window.showInputBox({ prompt: '为这本 TXT 设置书名', placeHolder: '书架中显示的名称', value: suggested, ignoreFocusOut: true });
+    return title?.trim().slice(0, 80) || suggested;
+  }
+
+  private async renameReaderLibrary(webview: vscode.Webview, uri: string): Promise<void> {
+    const entry = this.state.snapshot().reader.library.find((item) => item.uri === uri);
+    if (!entry) return;
+    const title = await vscode.window.showInputBox({ prompt: '修改书架名称', value: entry.title, ignoreFocusOut: true });
+    if (!title?.trim()) return;
+    await this.state.renameReaderLibraryEntry(uri, title.trim().slice(0, 80));
+    await this.post(webview, { type: 'app', data: this.state.snapshot() });
+  }
+
+  private async removeReaderLibrary(webview: vscode.Webview, uri: string): Promise<void> {
+    const entry = this.state.snapshot().reader.library.find((item) => item.uri === uri);
+    if (!entry) return;
+    const confirmed = await vscode.window.showWarningMessage(`移除“${entry.title}”只会删除书架记录，不会删除本地 TXT 文件。`, { modal: true }, '移除记录');
+    if (confirmed !== '移除记录') return;
+    await this.state.removeReaderLibraryEntry(uri);
+    await this.post(webview, { type: 'readerDocument', data: undefined, reader: this.state.snapshot().reader });
+    await this.post(webview, { type: 'readerChapter', data: undefined, reader: this.state.snapshot().reader });
   }
   private async searchReader(webview: vscode.Webview, query: string): Promise<void> {
     const reader = this.state.snapshot().reader;
@@ -168,10 +202,8 @@ function isString(value: unknown): value is string { return typeof value === 'st
 function isNonNegativeInteger(value: unknown): value is number { return typeof value === 'number' && Number.isInteger(value) && value >= 0; }
 function isModule(value: unknown): value is WorkspaceModule { return typeof value === 'string' && modules.includes(value as WorkspaceModule); }
 function toReaderDocumentPayload(document: ReaderDocument): Omit<ReaderDocument, 'text'> { const { text: _text, ...payload } = document; return payload; }
-function updateReaderLibrary(library: ReaderLibraryEntry[], document: ReaderDocument): ReaderLibraryEntry[] {
-  const existing = library.find((item) => item.uri === document.uri);
-  const entry: ReaderLibraryEntry = { title: document.title, uri: document.uri, lastOpened: Date.now(), progress: 0, chapterIndex: 0, chapterPosition: 0, bookmarks: [], recentChapters: [], totalReadingSeconds: 0, ...existing };
-  return [entry, ...library.filter((item) => item.uri !== document.uri)].slice(0, 12);
+function defaultReaderTitle(fileName: string): string {
+  return fileName.replace(/\.txt$/i, '').trim() || '未命名 TXT';
 }
 function filterReaderUpdate(update: Record<string, unknown>): Partial<Pick<WorkspaceSnapshot['reader'], 'progress' | 'position' | 'chapterPosition'>> {
   const reader: Partial<Pick<WorkspaceSnapshot['reader'], 'progress' | 'position' | 'chapterPosition'>> = {};

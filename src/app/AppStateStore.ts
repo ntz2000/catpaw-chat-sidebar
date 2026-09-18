@@ -133,6 +133,15 @@ export class AppStateStore {
     await this.persist();
   }
 
+  public async recordReaderRecentChapter(uri: string, chapter: Pick<ReaderLibraryEntry['recentChapters'][number], 'chapterIndex' | 'chapterPosition' | 'title'>): Promise<void> {
+    const existing = this.state.reader.library.find((item) => item.uri === uri);
+    if (!existing) return;
+    const recent = { ...chapter, openedAt: Date.now() };
+    const entry = { ...existing, lastOpened: recent.openedAt, recentChapters: [recent, ...existing.recentChapters.filter((item) => item.chapterIndex !== recent.chapterIndex || item.chapterPosition !== recent.chapterPosition)].slice(0, 10) };
+    this.state.reader.library = [entry, ...this.state.reader.library.filter((item) => item.uri !== uri)];
+    await this.persist();
+  }
+
   public async removeReaderLibraryEntry(uri: string): Promise<void> {
     this.state.reader.library = this.state.reader.library.filter((item) => item.uri !== uri);
     if (this.state.reader.uri === uri) this.state.reader = { ...this.state.reader, title: 'Local TXT Reader', uri: undefined, progress: 0, position: 0, chapterIndex: 0, chapterPosition: 0, bookmarks: [] };
