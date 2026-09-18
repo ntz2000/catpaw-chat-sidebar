@@ -21,9 +21,10 @@ Reader 已只围绕用户自己选择的 TXT 文件实现，不包含网络小�
 | --- | --- |
 | `Ctrl+;` | 上一页 |
 | `Ctrl+'` | 下一页 |
+| `Ctrl+Alt+R` | 在正文专注模式中恢复 Reader 控件 |
 
 `Workspace: Quick Hide` 是现有命令：它切换到中性的 Dashboard，不会伪造内容、关闭 IDE 或修改系统窗口。它的快捷键应在 CatPaw / VS Code 的 Keyboard Shortcuts 中按个人偏好配置，而不是由 Reader 覆盖编辑器快捷键。
 
 ## 状态标记
 
-上述 Reader 能力已在 0.0.21 实现。TXT 不会通过 Webview 直接读文件；界面只接收当前章节的纯文本和目录数据。透明度滑块位于 Reader 工具栏，会同步作用于该工具栏；可勾选 Hide controls 收起它，并通过细小的 `⋯` 恢复。目录保持高对比且不透明。
+上述 Reader 能力已在 0.0.22 实现。TXT 不会通过 Webview 直接读文件；界面只接收当前章节的纯文本和目录数据。透明度滑块位于 Reader 工具栏，会同步作用于该工具栏；可勾选 Hide controls 进入只有正文的专注模式，并通过 `Ctrl+Alt+R` 恢复。目录保持高对比且不透明。

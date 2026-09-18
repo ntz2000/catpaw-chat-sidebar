@@ -191,6 +191,21 @@ test('Reader batches frequent scroll progress saves', async () => {
   dom.window.close();
 });
 
+test('Hidden Reader controls leave a text-only surface and restore from the keyboard', () => {
+  const dom = new JSDOM('<!doctype html><div id="app"></div>', { runScripts: 'outside-only', url: 'https://workspace.test/' });
+  const source = readFileSync(resolve(__dirname, '../../media/workspace.js'), 'utf8');
+  dom.window.eval(`var __workspaceSent = []; var acquireVsCodeApi = () => ({ postMessage: message => __workspaceSent.push(message) });\n${source}`);
+  dom.window.dispatchEvent(new dom.window.MessageEvent('message', {
+    data: { type: 'bootstrap', module: 'reader', app: { settings: { readerControlsHidden: true }, reader: { chapterIndex: 0, bookmarks: [], library: [] }, web: {} }, readerDocument: { title: 'Local', chapters: [{ index: 0, title: '第一章', start: 0, end: 2 }] }, readerChapter: { chapter: { index: 0, title: '第一章', start: 0, end: 2 }, text: '正文' } }
+  }));
+  assert.equal(dom.window.document.querySelector('.reader-page')?.classList.contains('reader-controls-hidden'), true);
+  assert.equal(dom.window.document.querySelector('.reader-controls-toggle'), null);
+  dom.window.document.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'r', ctrlKey: true, altKey: true, bubbles: true }));
+  const sent = dom.window.__workspaceSent as Array<Record<string, unknown>>;
+  assert.equal((sent.at(-1)?.data as { readerControlsHidden?: boolean }).readerControlsHidden, false);
+  dom.window.close();
+});
+
 test('Settings exposes Reader height and Quick Hide shortcut configuration', () => {
   const dom = new JSDOM('<!doctype html><div id="app"></div>', { runScripts: 'outside-only', url: 'https://workspace.test/' });
   const source = readFileSync(resolve(__dirname, '../../media/workspace.js'), 'utf8');
