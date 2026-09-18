@@ -2,7 +2,7 @@
   "name": "catpaw-chat-sidebar",
   "displayName": "Workspace",
   "description": "A private Workspace for VS Code-compatible IDEs.",
-  "version": "0.0.23",
+  "version": "0.0.24",
   "publisher": "catpaw",
   "repository": {
     "type": "git",
