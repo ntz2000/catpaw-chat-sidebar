@@ -4,9 +4,10 @@ import { AppStateStore } from './AppStateStore';
 import { selectBrowserOpenCommand } from './browserCommand';
 import { AIService } from '../services/AIService';
 import { ChatService } from '../services/ChatService';
+import { ReaderDocument, ReaderLibraryEntry } from '../types/reader';
 import { ReaderService } from '../services/ReaderService';
 import { WebService, WebServiceError, normalizeWebUrl } from '../services/WebService';
-import { WorkspaceModule, WorkspaceSettings } from '../types/app';
+import { WorkspaceModule, WorkspaceSettings, WorkspaceSnapshot } from '../types/app';
 import { WebNavigationEntry, WebPage } from '../types/web';
 import { getWorkspaceHtml } from '../webview/workspaceHtml';
 
@@ -38,8 +39,22 @@ export class WorkspaceViewProvider implements vscode.WebviewViewProvider {
         case 'aiSend': if (isString(request.conversationId) && isString(request.text)) { await this.post(webview, { type: 'aiMessages', conversationId: request.conversationId, data: await this.ai.sendMessage(request.conversationId, request.text) }); await this.post(webview, { type: 'aiConversations', data: await this.ai.getConversations() }); } break;
         case 'aiRename': if (isString(request.conversationId) && isString(request.title)) { await this.ai.renameConversation(request.conversationId, request.title); await this.post(webview, { type: 'aiConversations', data: await this.ai.getConversations() }); } break;
         case 'aiDelete': if (isString(request.conversationId)) { await this.ai.deleteConversation(request.conversationId); await this.post(webview, { type: 'aiConversations', data: await this.ai.getConversations() }); } break;
-        case 'openReaderFile': { const document = await this.reader.openFile(); if (document) { await this.state.updateReader({ title: document.title, uri: document.uri, progress: 0, position: 0 }); await this.post(webview, { type: 'readerDocument', data: document, reader: this.state.snapshot().reader }); } break; }
-        case 'saveReader': if (isRecord(request.data)) { await this.state.updateReader(request.data); await this.post(webview, { type: 'app', data: this.state.snapshot() }); } break;
+        case 'openReaderFile': {
+          const document = await this.reader.openFile();
+          if (document) {
+            const library = updateReaderLibrary(this.state.snapshot().reader.library, document);
+            await this.state.updateReader({ title: document.title, uri: document.uri, progress: 0, position: 0, chapterIndex: 0, chapterPosition: 0, bookmarks: [], library });
+            await this.postReaderDocument(webview, document, 0);
+          }
+          break;
+        }
+        case 'readerOpenChapter': if (isNonNegativeInteger(request.chapterIndex)) await this.openReaderChapter(webview, request.chapterIndex); break;
+        case 'readerOpenRecent': if (isString(request.uri)) await this.openRecentReader(webview, request.uri); break;
+        case 'readerSearch': if (isString(request.query)) await this.searchReader(webview, request.query); break;
+        case 'readerAddBookmark': await this.addReaderBookmark(webview, isString(request.label) ? request.label : undefined); break;
+        case 'readerRemoveBookmark': if (isNonNegativeInteger(request.index)) { const bookmarks = this.state.snapshot().reader.bookmarks.filter((_, index) => index !== request.index); await this.state.updateReader({ bookmarks }); await this.post(webview, { type: 'app', data: this.state.snapshot() }); } break;
+        case 'readerConfigureQuickHide': await vscode.commands.executeCommand('workbench.action.openGlobalKeybindings', 'workspace.quickHide'); break;
+        case 'saveReader': if (isRecord(request.data)) { await this.state.updateReader(filterReaderUpdate(request.data)); } break;
         case 'updateSettings': if (isRecord(request.data)) { await this.state.updateSettings(request.data as Partial<WorkspaceSettings>); await this.post(webview, { type: 'app', data: this.state.snapshot() }); } break;
         case 'saveGame': if (isString(request.game) && isRecord(request.data) && typeof request.data.score === 'number' && typeof request.data.best === 'number') { await this.state.saveGame(request.game, { score: request.data.score, best: request.data.best, snapshot: request.data.snapshot }); } break;
         case 'quickBreak': { const names = ['snake', 'flappy', '2048', 'breakout', 'tetris', 'mines', 'sudoku', 'bubble']; await this.post(webview, { type: 'quickBreak', game: names[Math.floor(Math.random() * names.length)] }); break; }
@@ -60,8 +75,55 @@ export class WorkspaceViewProvider implements vscode.WebviewViewProvider {
   private async bootstrap(webview: vscode.Webview): Promise<void> {
     const app = this.state.snapshot();
     let readerDocument: unknown;
-    if (app.reader.uri) { try { readerDocument = await this.reader.readUri(app.reader.uri); } catch { readerDocument = undefined; } }
-    await this.post(webview, { type: 'bootstrap', app, conversations: await this.chat.getConversations(), aiConversations: await this.ai.getConversations(), readerDocument, module: this.state.restoreModule() });
+    let readerChapter: unknown;
+    if (app.reader.uri) {
+      try {
+        const document = await this.reader.readUri(app.reader.uri);
+        readerDocument = toReaderDocumentPayload(document);
+        readerChapter = await this.reader.getChapter(document.uri, app.reader.chapterIndex);
+      } catch { readerDocument = undefined; }
+    }
+    await this.post(webview, { type: 'bootstrap', app, conversations: await this.chat.getConversations(), aiConversations: await this.ai.getConversations(), readerDocument, readerChapter, module: this.state.restoreModule() });
+  }
+  private async postReaderDocument(webview: vscode.Webview, document: ReaderDocument, chapterIndex: number): Promise<void> {
+    await this.post(webview, { type: 'readerDocument', data: toReaderDocumentPayload(document), reader: this.state.snapshot().reader });
+    await this.post(webview, { type: 'readerChapter', data: await this.reader.getChapter(document.uri, chapterIndex), reader: this.state.snapshot().reader });
+  }
+  private async openReaderChapter(webview: vscode.Webview, requestedIndex: number): Promise<void> {
+    const reader = this.state.snapshot().reader;
+    if (!reader.uri) return;
+    const content = await this.reader.getChapter(reader.uri, requestedIndex);
+    await this.state.updateReader({ chapterIndex: content.chapter.index, chapterPosition: 0, position: 0, progress: Math.round(((content.chapter.index + 1) / Math.max(1, (await this.reader.readUri(reader.uri)).chapters.length)) * 100) });
+    await this.post(webview, { type: 'readerChapter', data: content, reader: this.state.snapshot().reader });
+  }
+  private async openRecentReader(webview: vscode.Webview, uri: string): Promise<void> {
+    const document = await this.reader.readUri(uri);
+    const library = updateReaderLibrary(this.state.snapshot().reader.library, document);
+    await this.state.updateReader({ title: document.title, uri: document.uri, progress: 0, position: 0, chapterIndex: 0, chapterPosition: 0, bookmarks: [], library });
+    await this.postReaderDocument(webview, document, 0);
+  }
+  private async searchReader(webview: vscode.Webview, query: string): Promise<void> {
+    const reader = this.state.snapshot().reader;
+    if (!reader.uri || !query.trim()) { await this.post(webview, { type: 'readerSearchResults', data: [] }); return; }
+    const document = await this.reader.readUri(reader.uri);
+    const needle = query.trim().toLocaleLowerCase();
+    const results: Array<{ chapterIndex: number; position: number; snippet: string }> = [];
+    let position = 0;
+    while (results.length < 30) {
+      const found = document.text.toLocaleLowerCase().indexOf(needle, position);
+      if (found < 0) break;
+      const chapter = document.chapters.find((item) => found >= item.start && found < item.end) ?? document.chapters[0];
+      results.push({ chapterIndex: chapter.index, position: found - chapter.start, snippet: document.text.slice(Math.max(0, found - 30), Math.min(document.text.length, found + query.length + 45)).replace(/\s+/g, ' ') });
+      position = found + needle.length;
+    }
+    await this.post(webview, { type: 'readerSearchResults', data: results, query });
+  }
+  private async addReaderBookmark(webview: vscode.Webview, label?: string): Promise<void> {
+    const reader = this.state.snapshot().reader;
+    const bookmark = { chapterIndex: reader.chapterIndex, position: reader.chapterPosition, ...(label?.trim() ? { label: label.trim().slice(0, 80) } : {}) };
+    const duplicate = reader.bookmarks.some((item) => item.chapterIndex === bookmark.chapterIndex && item.position === bookmark.position);
+    if (!duplicate) await this.state.updateReader({ bookmarks: [...reader.bookmarks, bookmark] });
+    await this.post(webview, { type: 'app', data: this.state.snapshot() });
   }
   private async loadWeb(webview: vscode.Webview, url: string, mode: 'new' | 'restore'): Promise<void> {
     await this.post(webview, { type: 'webLoading', url });
@@ -100,4 +162,20 @@ export class WorkspaceViewProvider implements vscode.WebviewViewProvider {
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null; }
 function isRequest(value: unknown): value is Request { return isRecord(value) && typeof value.type === 'string'; }
 function isString(value: unknown): value is string { return typeof value === 'string'; }
+function isNonNegativeInteger(value: unknown): value is number { return typeof value === 'number' && Number.isInteger(value) && value >= 0; }
 function isModule(value: unknown): value is WorkspaceModule { return typeof value === 'string' && modules.includes(value as WorkspaceModule); }
+function toReaderDocumentPayload(document: ReaderDocument): Omit<ReaderDocument, 'text'> { const { text: _text, ...payload } = document; return payload; }
+function updateReaderLibrary(library: ReaderLibraryEntry[], document: ReaderDocument): ReaderLibraryEntry[] {
+  const entry: ReaderLibraryEntry = { title: document.title, uri: document.uri, lastOpened: Date.now() };
+  return [entry, ...library.filter((item) => item.uri !== document.uri)].slice(0, 12);
+}
+function filterReaderUpdate(update: Record<string, unknown>): Partial<Pick<WorkspaceSnapshot['reader'], 'progress' | 'position' | 'chapterPosition'>> {
+  const reader: Partial<Pick<WorkspaceSnapshot['reader'], 'progress' | 'position' | 'chapterPosition'>> = {};
+  for (const key of ['progress', 'position', 'chapterPosition']) {
+    const value = update[key];
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+      if (key === 'progress' || key === 'position' || key === 'chapterPosition') reader[key] = value;
+    }
+  }
+  return reader;
+}

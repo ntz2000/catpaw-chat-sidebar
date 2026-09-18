@@ -40,3 +40,19 @@ test('keeps Text Web navigation history, forward state, and bookmarks', async ()
   assert.equal(store.snapshot().web.bookmarks[0].url, 'https://example.com/two');
   assert.equal(store.snapshot().web.history.length, 2);
 });
+
+test('keeps reader display preferences and chapter-aware bookmarks', async () => {
+  const store = new AppStateStore(new MemoryStore());
+
+  await store.updateSettings({ readerOpacity: 42, readerHeight: 480, readerMode: 'page' });
+  await store.updateReader({
+    chapterIndex: 2,
+    chapterPosition: 34,
+    bookmarks: [{ chapterIndex: 2, position: 34, label: '关键段落' }]
+  });
+
+  assert.equal(store.snapshot().settings.readerOpacity, 42);
+  assert.equal(store.snapshot().settings.readerHeight, 480);
+  assert.equal(store.snapshot().settings.readerMode, 'page');
+  assert.deepEqual(store.snapshot().reader.bookmarks, [{ chapterIndex: 2, position: 34, label: '关键段落' }]);
+});

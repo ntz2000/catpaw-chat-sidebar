@@ -19,12 +19,17 @@ function initialState(): WorkspaceSnapshot {
       readerFontSize: 15,
       readerLineHeight: 1.8,
       readerWidth: 720,
+      readerHeight: 560,
+      readerOpacity: 100,
+      readerTheme: 'system',
+      readerMode: 'scroll',
+      readerFontFamily: 'var(--vscode-editor-font-family)',
       defaultPage: 'dashboard'
     },
     recentChat: '张三',
     recentAi: '随便聊聊',
     recentGame: '2048',
-    reader: { title: '《三体》', progress: 61, position: 0, bookmarks: [] },
+    reader: { title: '《三体》', progress: 61, position: 0, chapterIndex: 0, chapterPosition: 0, bookmarks: [], library: [] },
     games: {},
     web: { backStack: [], forwardStack: [], history: [], bookmarks: [], scrollPosition: 0, findQuery: '' }
   };
@@ -41,7 +46,7 @@ export class AppStateStore {
       ...defaults,
       ...stored,
       settings: { ...defaults.settings, ...stored.settings },
-      reader: { ...defaults.reader, ...stored.reader },
+      reader: { ...defaults.reader, ...stored.reader, bookmarks: migrateBookmarks(stored.reader?.bookmarks, stored.reader?.chapterIndex ?? 0), library: stored.reader?.library ?? [] },
       games: stored.games ?? {},
       web: { ...defaults.web, ...stored.web, backStack: stored.web?.backStack ?? [], forwardStack: stored.web?.forwardStack ?? [], history: stored.web?.history ?? [], bookmarks: stored.web?.bookmarks ?? [] }
     } : defaults;
@@ -167,6 +172,21 @@ export class AppStateStore {
   private async persist(): Promise<void> {
     await this.storage.update(STATE_KEY, this.state);
   }
+}
+
+function migrateBookmarks(value: unknown, chapterIndex: number): WorkspaceSnapshot['reader']['bookmarks'] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((bookmark) => {
+    if (typeof bookmark === 'number' && Number.isFinite(bookmark)) return [{ chapterIndex, position: bookmark }];
+    if (!bookmark || typeof bookmark !== 'object') return [];
+    const item = bookmark as { chapterIndex?: unknown; position?: unknown; label?: unknown };
+    if (typeof item.chapterIndex !== 'number' || typeof item.position !== 'number') return [];
+    return [{
+      chapterIndex: item.chapterIndex,
+      position: item.position,
+      ...(typeof item.label === 'string' && item.label.trim() ? { label: item.label.trim().slice(0, 80) } : {})
+    }];
+  });
 }
 
 export class MemoryStore implements StateStorage {

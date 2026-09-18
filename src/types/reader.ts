@@ -1,1 +1,29 @@
-export interface ReaderDocument { title: string; uri: string; text: string; }
+export type ReaderMode = 'scroll' | 'page';
+export type ReaderTheme = 'system' | 'paper' | 'dim';
+
+export interface ReaderChapter {
+  index: number;
+  title: string;
+  start: number;
+  end: number;
+}
+
+export interface ReaderBookmark {
+  chapterIndex: number;
+  position: number;
+  label?: string;
+}
+
+export interface ReaderLibraryEntry {
+  title: string;
+  uri: string;
+  lastOpened: number;
+}
+
+export interface ReaderDocument {
+  title: string;
+  uri: string;
+  text: string;
+  encoding: string;
+  chapters: ReaderChapter[];
+}

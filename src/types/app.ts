@@ -1,4 +1,5 @@
 export type WorkspaceModule = 'dashboard' | 'inbox' | 'ai' | 'reader' | 'break' | 'web' | 'settings';
+import { ReaderBookmark, ReaderLibraryEntry, ReaderMode, ReaderTheme } from './reader';
 
 export interface WorkspaceSettings {
   privacyMode: boolean;
@@ -7,6 +8,11 @@ export interface WorkspaceSettings {
   readerFontSize: number;
   readerLineHeight: number;
   readerWidth: number;
+  readerHeight: number;
+  readerOpacity: number;
+  readerTheme: ReaderTheme;
+  readerMode: ReaderMode;
+  readerFontFamily: string;
   defaultPage: WorkspaceModule;
 }
 
@@ -22,7 +28,10 @@ export interface ReaderState {
   onlineUrl?: string;
   progress: number;
   position: number;
-  bookmarks: number[];
+  chapterIndex: number;
+  chapterPosition: number;
+  bookmarks: ReaderBookmark[];
+  library: ReaderLibraryEntry[];
 }
 
 export interface WorkspaceSnapshot {

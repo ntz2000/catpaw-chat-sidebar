@@ -138,19 +138,40 @@ test('switches from safe text to an in-Workspace full-page frame when a site per
   dom.window.close();
 });
 
-test('Reader exposes legal online-library sources and opens the selected source in Text Web', () => {
+test('Reader is local-only and sends chapter navigation from its focused reading surface', () => {
   const dom = new JSDOM('<!doctype html><div id="app"></div>', { runScripts: 'outside-only', url: 'https://workspace.test/' });
   const source = readFileSync(resolve(__dirname, '../../media/workspace.js'), 'utf8');
   dom.window.eval(`var __workspaceSent = []; var acquireVsCodeApi = () => ({ postMessage: message => __workspaceSent.push(message) });\n${source}`);
   dom.window.dispatchEvent(new dom.window.MessageEvent('message', {
-    data: { type: 'bootstrap', module: 'reader', app: { settings: {}, reader: { title: 'Local', progress: 0, position: 0, bookmarks: [] }, web: {} } }
+    data: {
+      type: 'bootstrap', module: 'reader',
+      app: { settings: { readerOpacity: 42, readerHeight: 480 }, reader: { title: 'Local', progress: 0, position: 0, chapterIndex: 0, bookmarks: [], library: [] }, web: {} },
+      readerDocument: { title: 'Local', uri: 'file:///local.txt', encoding: 'utf-8', chapters: [{ index: 0, title: '第一章', start: 0, end: 2 }, { index: 1, title: '第二章', start: 2, end: 4 }] },
+      readerChapter: { chapter: { index: 0, title: '第一章', start: 0, end: 2 }, text: '正文' }
+    }
   }));
 
-  const sourceButton = Array.from(dom.window.document.querySelectorAll<HTMLButtonElement>('.online-library .card')).find((button) => button.textContent?.includes('维基文库'));
-  assert.equal(dom.window.document.querySelector('.online-library h3')?.textContent, 'Online Library');
-  sourceButton?.click();
+  const surface = dom.window.document.querySelector<HTMLElement>('.reader-surface');
+  surface?.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'd', bubbles: true }));
   const sent = dom.window.__workspaceSent as Array<Record<string, unknown>>;
-  assert.equal(sent.at(-1)?.type, 'webOpen');
-  assert.equal(sent.at(-1)?.url, 'https://zh.wikisource.org/zh-hans/Wikisource');
+  assert.equal(dom.window.document.querySelector('.online-library'), null);
+  assert.equal(sent.at(-1)?.type, 'readerOpenChapter');
+  assert.equal(sent.at(-1)?.chapterIndex, 1);
+  const readerPage = dom.window.document.querySelector<HTMLElement>('.reader-page');
+  assert.equal(readerPage?.style.getPropertyValue('--reader-opacity'), '0.42');
+  assert.equal(readerPage?.style.getPropertyValue('--reader-height'), '480px');
+  dom.window.close();
+});
+
+test('Settings exposes Reader opacity, text height, and Quick Hide shortcut configuration', () => {
+  const dom = new JSDOM('<!doctype html><div id="app"></div>', { runScripts: 'outside-only', url: 'https://workspace.test/' });
+  const source = readFileSync(resolve(__dirname, '../../media/workspace.js'), 'utf8');
+  dom.window.eval(`var __workspaceSent = []; var acquireVsCodeApi = () => ({ postMessage: message => __workspaceSent.push(message) });\n${source}`);
+  dom.window.dispatchEvent(new dom.window.MessageEvent('message', { data: { type: 'bootstrap', module: 'settings', app: { settings: {}, reader: {}, web: {} } } }));
+  assert.match(dom.window.document.body.textContent ?? '', /Reader Opacity/);
+  assert.match(dom.window.document.body.textContent ?? '', /Reader Height/);
+  const configure = Array.from(dom.window.document.querySelectorAll('button')).find((item) => item.textContent === 'Configure Quick Hide Shortcut');
+  configure?.click();
+  assert.equal((dom.window.__workspaceSent as Array<Record<string, unknown>>).at(-1)?.type, 'readerConfigureQuickHide');
   dom.window.close();
 });

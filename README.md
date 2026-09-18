@@ -7,12 +7,12 @@ Workspace 是一个可安装到 CatPaw 或 VS Code 的本地工作区扩展。�
 - **Dashboard**：Inbox 未读、阅读进度、Mock AI、最近游戏、Quick Break 与 Privacy Mode。
 - **Inbox**：四个 Mock 会话、搜索、未读、发送、Enter 发送与 Shift+Enter 换行。
 - **AI**：本地 Mock AI，可创建、重命名、删除会话并保存状态。
-- **Reader**：由 Extension Host 打开本地 TXT，保存进度、书签和阅读样式；也提供合规的在线来源入口（维基文库、Project Gutenberg），只跳转来源网站，不转载或聚合内容。
+- **Reader**：由 Extension Host 打开本地 TXT，支持 UTF-8、UTF-16、GB18030/GBK 解码、自动分章、本地书目、章节搜索、书签、进度和阅读样式。
 - **Text Web**：提供安全的 **Reader / Document / Source Text** 三种文本视图。网页会在 Extension Host 中规范化后再显示，Reader 视图会移除导航、Cookie、登录提示、页脚与推荐等噪音。需要脚本、登录、验证码或二维码时，可明确打开 IDE 内的 **Interactive Browser**（Simple Browser）；**Open External** 仅在用户主动点击时打开系统浏览器。
 - **Break**：Snake、Flappy、2048、Breakout、Tetris、Mines、Sudoku、Bubble 八个纯原生小游戏。
 - **Privacy Mode**：Inbox 与 Dashboard 内的联系人和预览匿名/模糊；重新进入时显示 Dashboard。
 - **Quick Hide**：`Workspace: Quick Hide`，默认 `Ctrl+Alt+H`，在 Dashboard 与之前模块间切换。
-- **Settings**：Privacy Mode、动画、游戏声音、Reader/Text Web 字号、行距、宽度及默认页，均保存到 `globalState`。
+- **Settings**：Privacy Mode、动画、游戏声音、Reader/Text Web 字号、行距、宽度、阅读区高度、主题、透明度及默认页，均保存到 `globalState`。
 
 Reader 的当前边界、后续本地 TXT 升级方案、透明度与键盘控制说明见 [docs/reader-guide.md](docs/reader-guide.md)。文档会明确区分已实现与规划中的功能。
 
@@ -29,14 +29,14 @@ Text Web 的文本模式不是完整浏览器：它不加载远程 JavaScript/CS
 - 仅支持 `http:`、`https:` 和 HTML/XHTML/纯文本响应；PDF、图片、视频等会给出说明，并可使用 **Open External**。
 - JavaScript-heavy 页面只能取得初始 HTML 时会显示 `Limited content available`；这时请使用 **Interactive Browser** 或显式选择 **Open External**。
 
-## 在线阅读
+## 本地 Reader
 
-Reader 的 **Online Library** 提供两个公开、合法的来源入口：
+Reader 只读取用户主动选择的本地 TXT；文件由 Extension Host 读取，Webview 不接触文件系统。打开后会记录到本地书目，并只渲染当前章节，适合较大的 TXT。
 
-- [中文维基文库](https://zh.wikisource.org/zh-hans/Wikisource)：中文公有领域与自由许可文本。
-- [Project Gutenberg](https://www.gutenberg.org/)：公有领域电子书。
-
-点击来源后会进入 Text Web；需要完整站点功能时可切换到 Interactive Browser。扩展不内置、不抓取也不重新发布受版权保护的小说内容。
+- **编码与目录**：自动尝试 UTF-8、UTF-16、GB18030、GBK，并识别“第…章/节/回/篇/话”、序章、楔子和尾声等章节标题；没有标题时按文本块分章。
+- **阅读控制**：正文聚焦后，`W/S` 翻上一页/下一页，`A/D` 切换章节，`Space`/`Shift+Space` 翻页，`B` 添加书签，`T` 开关目录，`/` 聚焦搜索，`Esc` 返回正文。
+- **样式**：Settings 中可调字号、行距、宽度、高度、System/Paper/Dim 主题以及正文表层 0–100% 透明度。透明度不会改变 IDE 窗口或其他区域。
+- **Quick Hide**：默认仍为 `Ctrl+Alt+H`，只在 Dashboard 和之前模块间切换。Settings 的 **Configure Quick Hide Shortcut** 会打开 IDE 标准快捷键设置，便于自行修改。
 
 ## 游戏控制
 
@@ -61,7 +61,7 @@ npm test
 npm run package
 ```
 
-`npm run package` 会在项目根目录生成 `catpaw-chat-sidebar-0.0.18.vsix`。
+`npm run package` 会在项目根目录生成 `catpaw-chat-sidebar-0.0.19.vsix`。
 
 ## 安装到 CatPaw / VS Code
 
