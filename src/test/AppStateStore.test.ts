@@ -57,3 +57,34 @@ test('keeps reader display preferences and chapter-aware bookmarks', async () =>
   assert.equal(store.snapshot().settings.readerControlsHidden, true);
   assert.deepEqual(store.snapshot().reader.bookmarks, [{ chapterIndex: 2, position: 34, label: '关键段落' }]);
 });
+
+test('keeps named reading progress independently for each bookshelf entry', async () => {
+  const store = new AppStateStore(new MemoryStore());
+
+  await store.upsertReaderLibraryEntry({ uri: 'file:///book-a.txt', title: '自定义书名 A' });
+  await store.updateReaderLibraryEntry('file:///book-a.txt', {
+    progress: 38,
+    chapterIndex: 2,
+    chapterPosition: 120,
+    bookmarks: [{ chapterIndex: 2, position: 120, label: '继续阅读' }]
+  });
+  await store.upsertReaderLibraryEntry({ uri: 'file:///book-b.txt', title: '自定义书名 B' });
+
+  const [latest, earlier] = store.snapshot().reader.library;
+  assert.equal(latest.title, '自定义书名 B');
+  assert.equal(earlier.title, '自定义书名 A');
+  assert.equal(earlier.chapterIndex, 2);
+  assert.equal(earlier.chapterPosition, 120);
+  assert.deepEqual(earlier.bookmarks, [{ chapterIndex: 2, position: 120, label: '继续阅读' }]);
+});
+
+test('removing a bookshelf entry clears only its local record', async () => {
+  const store = new AppStateStore(new MemoryStore());
+  await store.upsertReaderLibraryEntry({ uri: 'file:///book.txt', title: '保留原文件' });
+  await store.updateReader({ uri: 'file:///book.txt', title: '保留原文件' });
+
+  await store.removeReaderLibraryEntry('file:///book.txt');
+
+  assert.equal(store.snapshot().reader.library.length, 0);
+  assert.equal(store.snapshot().reader.uri, undefined);
+});

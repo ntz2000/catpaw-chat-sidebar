@@ -1,4 +1,5 @@
 import { GameSave, WorkspaceModule, WorkspaceSettings, WorkspaceSnapshot } from '../types/app';
+import { ReaderLibraryEntry } from '../types/reader';
 import { WebNavigationEntry, WebState } from '../types/web';
 
 export interface StateStorage {
@@ -47,7 +48,7 @@ export class AppStateStore {
       ...defaults,
       ...stored,
       settings: { ...defaults.settings, ...stored.settings },
-      reader: { ...defaults.reader, ...stored.reader, bookmarks: migrateBookmarks(stored.reader?.bookmarks, stored.reader?.chapterIndex ?? 0), library: stored.reader?.library ?? [] },
+      reader: { ...defaults.reader, ...stored.reader, bookmarks: migrateBookmarks(stored.reader?.bookmarks, stored.reader?.chapterIndex ?? 0), library: migrateLibrary(stored.reader?.library, stored.reader) },
       games: stored.games ?? {},
       web: { ...defaults.web, ...stored.web, backStack: stored.web?.backStack ?? [], forwardStack: stored.web?.forwardStack ?? [], history: stored.web?.history ?? [], bookmarks: stored.web?.bookmarks ?? [] }
     } : defaults;
@@ -105,6 +106,36 @@ export class AppStateStore {
 
   public async updateReader(update: Partial<WorkspaceSnapshot['reader']>): Promise<void> {
     this.state.reader = { ...this.state.reader, ...update };
+    this.syncCurrentReaderToLibrary();
+    await this.persist();
+  }
+
+  public async upsertReaderLibraryEntry(entry: Pick<ReaderLibraryEntry, 'uri' | 'title'>): Promise<ReaderLibraryEntry> {
+    const existing = this.state.reader.library.find((item) => item.uri === entry.uri);
+    const next: ReaderLibraryEntry = { ...newReaderLibraryEntry(entry), ...existing, title: existing?.title ?? entry.title, lastOpened: Date.now() };
+    this.state.reader.library = [next, ...this.state.reader.library.filter((item) => item.uri !== entry.uri)];
+    await this.persist();
+    return structuredClone(next);
+  }
+
+  public async renameReaderLibraryEntry(uri: string, title: string): Promise<void> {
+    this.state.reader.library = this.state.reader.library.map((item) => item.uri === uri ? { ...item, title } : item);
+    if (this.state.reader.uri === uri) this.state.reader.title = title;
+    await this.persist();
+  }
+
+  public async updateReaderLibraryEntry(uri: string, update: Partial<Omit<ReaderLibraryEntry, 'uri'>>): Promise<void> {
+    this.state.reader.library = this.state.reader.library.map((item) => item.uri === uri ? { ...item, ...update } : item);
+    if (this.state.reader.uri === uri) {
+      const current = this.state.reader.library.find((item) => item.uri === uri);
+      if (current) this.state.reader = { ...this.state.reader, title: current.title, progress: current.progress, chapterIndex: current.chapterIndex, chapterPosition: current.chapterPosition, position: current.chapterPosition, bookmarks: current.bookmarks };
+    }
+    await this.persist();
+  }
+
+  public async removeReaderLibraryEntry(uri: string): Promise<void> {
+    this.state.reader.library = this.state.reader.library.filter((item) => item.uri !== uri);
+    if (this.state.reader.uri === uri) this.state.reader = { ...this.state.reader, title: 'Local TXT Reader', uri: undefined, progress: 0, position: 0, chapterIndex: 0, chapterPosition: 0, bookmarks: [] };
     await this.persist();
   }
 
@@ -170,6 +201,14 @@ export class AppStateStore {
     this.state.web.history = [entry, ...this.state.web.history.filter((item) => item.url !== entry.url)].slice(0, 50);
   }
 
+  private syncCurrentReaderToLibrary(): void {
+    const reader = this.state.reader;
+    if (!reader.uri) return;
+    const existing = this.state.reader.library.find((item) => item.uri === reader.uri);
+    if (!existing) return;
+    this.state.reader.library = [{ ...existing, title: reader.title || existing.title, progress: reader.progress, chapterIndex: reader.chapterIndex, chapterPosition: reader.chapterPosition, bookmarks: reader.bookmarks }, ...this.state.reader.library.filter((item) => item.uri !== reader.uri)];
+  }
+
   private async persist(): Promise<void> {
     await this.storage.update(STATE_KEY, this.state);
   }
@@ -188,6 +227,27 @@ function migrateBookmarks(value: unknown, chapterIndex: number): WorkspaceSnapsh
       ...(typeof item.label === 'string' && item.label.trim() ? { label: item.label.trim().slice(0, 80) } : {})
     }];
   });
+}
+
+function newReaderLibraryEntry(entry: Pick<ReaderLibraryEntry, 'uri' | 'title'>): ReaderLibraryEntry {
+  return { title: entry.title, uri: entry.uri, lastOpened: Date.now(), progress: 0, chapterIndex: 0, chapterPosition: 0, bookmarks: [], recentChapters: [], totalReadingSeconds: 0 };
+}
+
+function migrateLibrary(value: unknown, legacy?: Partial<WorkspaceSnapshot['reader']>): ReaderLibraryEntry[] {
+  const items = Array.isArray(value) ? value.flatMap((item) => {
+    if (!item || typeof item !== 'object') return [];
+    const candidate = item as Partial<ReaderLibraryEntry>;
+    if (typeof candidate.uri !== 'string' || typeof candidate.title !== 'string') return [];
+    return [{
+      ...newReaderLibraryEntry({ uri: candidate.uri, title: candidate.title }),
+      ...candidate,
+      bookmarks: migrateBookmarks(candidate.bookmarks, candidate.chapterIndex ?? 0),
+      recentChapters: Array.isArray(candidate.recentChapters) ? candidate.recentChapters.filter((chapter): chapter is ReaderLibraryEntry['recentChapters'][number] => Boolean(chapter) && typeof chapter === 'object' && typeof (chapter as { chapterIndex?: unknown }).chapterIndex === 'number' && typeof (chapter as { chapterPosition?: unknown }).chapterPosition === 'number' && typeof (chapter as { title?: unknown }).title === 'string' && typeof (chapter as { openedAt?: unknown }).openedAt === 'number').slice(0, 10) : [],
+      totalReadingSeconds: typeof candidate.totalReadingSeconds === 'number' && candidate.totalReadingSeconds >= 0 ? candidate.totalReadingSeconds : 0
+    }];
+  }) : [];
+  if (items.length || !legacy?.uri) return items;
+  return [{ ...newReaderLibraryEntry({ uri: legacy.uri, title: legacy.title || 'Local TXT Reader' }), progress: legacy.progress ?? 0, chapterIndex: legacy.chapterIndex ?? 0, chapterPosition: legacy.chapterPosition ?? 0, bookmarks: migrateBookmarks(legacy.bookmarks, legacy.chapterIndex ?? 0) }];
 }
 
 export class MemoryStore implements StateStorage {

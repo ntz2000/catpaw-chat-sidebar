@@ -169,7 +169,8 @@ function isNonNegativeInteger(value: unknown): value is number { return typeof v
 function isModule(value: unknown): value is WorkspaceModule { return typeof value === 'string' && modules.includes(value as WorkspaceModule); }
 function toReaderDocumentPayload(document: ReaderDocument): Omit<ReaderDocument, 'text'> { const { text: _text, ...payload } = document; return payload; }
 function updateReaderLibrary(library: ReaderLibraryEntry[], document: ReaderDocument): ReaderLibraryEntry[] {
-  const entry: ReaderLibraryEntry = { title: document.title, uri: document.uri, lastOpened: Date.now() };
+  const existing = library.find((item) => item.uri === document.uri);
+  const entry: ReaderLibraryEntry = { title: document.title, uri: document.uri, lastOpened: Date.now(), progress: 0, chapterIndex: 0, chapterPosition: 0, bookmarks: [], recentChapters: [], totalReadingSeconds: 0, ...existing };
   return [entry, ...library.filter((item) => item.uri !== document.uri)].slice(0, 12);
 }
 function filterReaderUpdate(update: Record<string, unknown>): Partial<Pick<WorkspaceSnapshot['reader'], 'progress' | 'position' | 'chapterPosition'>> {
