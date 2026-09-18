@@ -164,6 +164,10 @@ test('Reader is local-only and turns pages from global Ctrl shortcuts', () => {
   const readerPage = dom.window.document.querySelector<HTMLElement>('.reader-page');
   assert.equal(readerPage?.style.getPropertyValue('--reader-opacity'), '0.42');
   assert.equal(readerPage?.style.getPropertyValue('--reader-height'), '480px');
+  const hideControls = dom.window.document.querySelector<HTMLInputElement>('.reader-hide-control input');
+  hideControls?.click();
+  assert.equal(sent.at(-1)?.type, 'updateSettings');
+  assert.equal((sent.at(-1)?.data as { readerControlsHidden?: boolean }).readerControlsHidden, true);
   dom.window.close();
 });
 

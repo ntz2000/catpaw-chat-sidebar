@@ -44,7 +44,7 @@ test('keeps Text Web navigation history, forward state, and bookmarks', async ()
 test('keeps reader display preferences and chapter-aware bookmarks', async () => {
   const store = new AppStateStore(new MemoryStore());
 
-  await store.updateSettings({ readerOpacity: 42, readerHeight: 480, readerMode: 'page' });
+  await store.updateSettings({ readerOpacity: 42, readerHeight: 480, readerMode: 'page', readerControlsHidden: true });
   await store.updateReader({
     chapterIndex: 2,
     chapterPosition: 34,
@@ -54,5 +54,6 @@ test('keeps reader display preferences and chapter-aware bookmarks', async () =>
   assert.equal(store.snapshot().settings.readerOpacity, 42);
   assert.equal(store.snapshot().settings.readerHeight, 480);
   assert.equal(store.snapshot().settings.readerMode, 'page');
+  assert.equal(store.snapshot().settings.readerControlsHidden, true);
   assert.deepEqual(store.snapshot().reader.bookmarks, [{ chapterIndex: 2, position: 34, label: '关键段落' }]);
 });

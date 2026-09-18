@@ -21,6 +21,7 @@ function initialState(): WorkspaceSnapshot {
       readerWidth: 720,
       readerHeight: 560,
       readerOpacity: 100,
+      readerControlsHidden: false,
       readerTheme: 'system',
       readerMode: 'scroll',
       readerFontFamily: 'var(--vscode-editor-font-family)',
